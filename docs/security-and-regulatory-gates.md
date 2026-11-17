@@ -1,16 +1,19 @@
-# Security and regulatory implementation gates
+# Security and regulatory production gates
 
-Before any production or live-market use, complete a jurisdiction-by-jurisdiction legal assessment and implement at minimum:
+The repository includes development implementations of TOTP MFA, short-lived JWTs, refresh-token rotation, access-token revocation and optional OIDC issuer validation. These do not replace the following production controls:
 
-- OIDC/OAuth 2.1 authentication, MFA, short-lived tokens, secure session handling and service identity.
-- RBAC/ABAC entitlements for participant, legal entity, desk, instrument, country and action.
-- KYC/KYB, sanctions screening, AML workflows and beneficial ownership checks as applicable.
-- Pre-trade credit, position, quantity, price-band, fat-finger and market-state controls.
-- Immutable, tamper-evident audit trail for quote, negotiation, order, cancel, amend and execution events.
-- Market-abuse surveillance, trade reporting, record retention and dispute workflows.
-- Encryption in transit and at rest, managed secrets, key rotation, vulnerability management and SBOM.
-- Threat modelling, penetration testing, SAST, dependency scanning, DAST and secure SDLC.
-- Data residency, cross-border transfer, privacy, retention and regulatory reporting controls.
-- HA/DR, tested backups, RPO/RTO, capacity testing, chaos/failover tests and operational runbooks.
+- Configure OIDC authorization-code + PKCE in the chosen identity provider/client; validate issuer, audience, signing-key rotation, role claims, MFA policy, session logout and account lifecycle.
+- Put API rate limits and brute-force/credential-stuffing protection at the edge; add MFA recovery codes, enrollment notifications and secure help-desk recovery.
+- Use managed KMS/HSM-backed encryption keys and secret rotation for JWT signing, MFA secrets, DB credentials and Kafka credentials.
+- Complete KYC/KYB, sanctions screening, AML workflows and beneficial ownership checks as applicable.
+- Implement participant/legal entity/desk/instrument/country/action entitlements and maker-checker approvals.
+- Add credit, position, price-band, fat-finger, market-state and aggregate exposure controls.
+- Make audit records tamper-evident with restricted database roles, append-only retention, signed exports and immutable backups.
+- Add consumer deduplication, schema registry, Kafka TLS/SASL/ACLs, DLQ, retention and event replay controls.
+- Integrate real settlement, clearing, custody, banking and commodity title systems; reconcile external statements and internal ledger daily.
+- Validate surveillance scenarios against market-abuse typologies and implement investigator workflow, evidence handling and escalation.
+- Map trade reports to each operating jurisdiction's rules, schemas, submission channels, deadlines and record-retention mandates.
+- Complete threat modelling, SAST, dependency scanning, DAST, penetration tests, SBOM, signed artifacts and incident response.
+- Test HA/DR, RPO/RTO, database failover, matching recovery, Kafka replay, capacity, latency and operational runbooks.
 
-Do not treat this checklist as legal advice or as evidence of compliance. Obtain qualified counsel and regulatory sign-off in every operating jurisdiction.
+This checklist is not legal advice or a compliance attestation. Obtain qualified counsel and regulator/venue approval for every market and jurisdiction before live operation.

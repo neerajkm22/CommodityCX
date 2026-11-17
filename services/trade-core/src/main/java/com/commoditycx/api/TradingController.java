@@ -1,53 +1,37 @@
 package com.commoditycx.api;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
+import com.commoditycx.security.TradingPrincipal;
+import com.commoditycx.service.TradingService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "http://localhost:4200")
 public class TradingController {
-    private final List<InstrumentView> instruments = List.of(
-        new InstrumentView(1L, "CRUDE-BRENT", "Crude Oil", "USD", "BBL"),
-        new InstrumentView(2L, "GOLD-1KG", "Gold", "USD", "KG")
-    );
-
-    @GetMapping("/health")
-    public Health health() { return new Health("UP", Instant.now()); }
-
-    @GetMapping("/instruments")
-    public List<InstrumentView> instruments() { return instruments; }
-
-    @PostMapping("/orders")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public OrderAcknowledgement submit(@Valid @RequestBody NewOrder order) {
-        if ("LIMIT".equals(order.orderType()) && order.price() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "LIMIT orders require price");
-        }
-        if (instruments.stream().noneMatch(i -> i.id().equals(order.instrumentId()))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Instrument not found");
-        }
-        // Demo acknowledgement only. No persistence, matching, risk checks or execution occurs.
-        return new OrderAcknowledgement(UUID.randomUUID(), "RECEIVED_NOT_EXECUTED", Instant.now());
+    private final TradingService service;
+    public TradingController(TradingService service){this.service=service;}
+    @GetMapping("/instruments") public List<Map<String,Object>> instruments(){return service.instruments();}
+    @PostMapping("/admin/instruments") @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN','COMPLIANCE')")
+    public Map<String,Object> instrument(@RequestBody Map<String,Object> body,@AuthenticationPrincipal TradingPrincipal actor){return service.createInstrument(body,actor);}
+    @PostMapping("/rfqs") @ResponseStatus(HttpStatus.CREATED)
+    public Map<String,Object> rfq(@RequestBody Map<String,Object> body,@AuthenticationPrincipal TradingPrincipal actor){return service.createRfq(body,actor);}
+    @PostMapping("/rfqs/{rfqId}/quotes") @ResponseStatus(HttpStatus.CREATED)
+    public Map<String,Object> quote(@PathVariable UUID rfqId,@RequestBody Map<String,Object> body,@AuthenticationPrincipal TradingPrincipal actor){return service.quote(rfqId,body,actor);}
+    @PostMapping("/quotes/{quoteId}/accept")
+    public Map<String,Object> accept(@PathVariable UUID quoteId,@AuthenticationPrincipal TradingPrincipal actor){return service.acceptQuote(quoteId,actor);}
+    @PostMapping("/orders") @ResponseStatus(HttpStatus.CREATED)
+    public List<Map<String,Object>> order(@RequestBody Map<String,Object> body,@RequestHeader(value="Idempotency-Key",required=false) String key,@AuthenticationPrincipal TradingPrincipal actor){return service.submitOrder(body,actor,key);}
+    @DeleteMapping("/orders/{orderId}") public Map<String,Object> cancel(@PathVariable UUID orderId,@AuthenticationPrincipal TradingPrincipal actor){return service.cancelOrder(orderId,actor);}
+    @GetMapping("/instruments/{instrumentId}/order-book") public List<Map<String,Object>> book(@PathVariable UUID instrumentId){return service.orderBook(instrumentId);}
+    @PostMapping("/trades/{tradeId}/confirm") public Map<String,Object> confirm(@PathVariable UUID tradeId,@AuthenticationPrincipal TradingPrincipal actor){return service.confirmTrade(tradeId,actor);}
+    @GetMapping("/audit/{entityId}") @PreAuthorize("hasAnyRole('ADMIN','COMPLIANCE','RISK_OFFICER')")
+    public List<Map<String,Object>> audit(@PathVariable UUID entityId){return service.audit(entityId);}
+    @PutMapping("/admin/participants/{participantId}/risk-limits") @PreAuthorize("hasAnyRole('ADMIN','RISK_OFFICER')")
+    public Map<String,Object> risk(@PathVariable UUID participantId,@RequestBody Map<String,Object> body,@AuthenticationPrincipal TradingPrincipal actor){
+        service.setRisk(participantId,body,actor);return Map.of("participantId",participantId,"updated",true);
     }
-
-    public record Health(String status, Instant time) {}
-    public record InstrumentView(Long id, String symbol, String commodity, String currency, String unit) {}
-    public record NewOrder(@NotNull Long instrumentId,
-        @NotBlank String participantId,
-        @Pattern(regexp = "BUY|SELL") String side,
-        @Pattern(regexp = "LIMIT|MARKET") String orderType,
-        @DecimalMin("0.00000001") BigDecimal price,
-        @NotNull @DecimalMin("0.00000001") BigDecimal quantity) {}
-    public record OrderAcknowledgement(UUID orderId, String status, Instant receivedAt) {}
 }

@@ -5,35 +5,59 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-commodities}
       POSTGRES_USER: ${POSTGRES_USER:-commodities}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d:ro
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data, ./database/init:/docker-entrypoint-initdb.d:ro]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U commodities -d commodities"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-commodities} -d ${POSTGRES_DB:-commodities}"]
       interval: 5s
       timeout: 3s
       retries: 15
   redis:
     image: redis:7
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    ports: ["${REDIS_PORT:-6379}:6379"]
   kafka:
     image: apache/kafka:4.0.0
-    ports:
-      - "${KAFKA_PORT:-9092}:9092"
+    ports: ["${KAFKA_PORT:-29092}:29092"]
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:${KAFKA_PORT:-29092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+  trade-core:
+    build: ./services/trade-core
+    ports: ["${SERVER_PORT:-8080}:8080"]
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-commodities}
+      DB_USER: ${POSTGRES_USER:-commodities}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-deploy-2026}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-10}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4200}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EVENTS_ENABLED: ${EVENTS_ENABLED:-false}
+      EVENTS_TOPIC: ${EVENTS_TOPIC:-commoditycx.events}
+      OIDC_ISSUER_URI: ${OIDC_ISSUER_URI:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-commoditycx-api}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
 volumes:
   pgdata:

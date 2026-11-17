@@ -1,0 +1,23 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret_encrypted TEXT;
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+CREATE TABLE refresh_tokens (id UUID PRIMARY KEY,user_id UUID NOT NULL REFERENCES users(id),token_hash CHAR(64) NOT NULL UNIQUE,expires_at TIMESTAMPTZ NOT NULL,revoked_at TIMESTAMPTZ,replaced_by UUID,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX refresh_tokens_user_idx ON refresh_tokens(user_id,expires_at);
+CREATE TABLE revoked_access_tokens (token_id VARCHAR(80) PRIMARY KEY,user_id UUID NOT NULL REFERENCES users(id),expires_at TIMESTAMPTZ NOT NULL,revoked_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE negotiation_messages (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),rfq_id UUID NOT NULL REFERENCES rfqs(id),quote_id UUID REFERENCES quotes(id),sender_participant_id UUID NOT NULL REFERENCES participants(id),message_type VARCHAR(20) NOT NULL CHECK(message_type IN ('OFFER','COUNTER','ACCEPT','REJECT','WITHDRAW')),price NUMERIC(24,8),quantity NUMERIC(24,8),currency CHAR(3),note VARCHAR(1000),created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX negotiation_rfq_idx ON negotiation_messages(rfq_id,created_at);
+CREATE TABLE event_outbox (id BIGSERIAL PRIMARY KEY,aggregate_type VARCHAR(60) NOT NULL,aggregate_id VARCHAR(100) NOT NULL,event_type VARCHAR(100) NOT NULL,payload JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),published_at TIMESTAMPTZ,attempts INTEGER NOT NULL DEFAULT 0,last_error TEXT);
+CREATE INDEX outbox_pending_idx ON event_outbox(id) WHERE published_at IS NULL;
+CREATE TABLE matching_partitions (partition_key VARCHAR(120) PRIMARY KEY,owner_id VARCHAR(120),lease_until TIMESTAMPTZ,fencing_token BIGINT NOT NULL DEFAULT 0,updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE idempotency_keys (user_id UUID NOT NULL REFERENCES users(id),idempotency_key VARCHAR(120) NOT NULL,request_hash CHAR(64) NOT NULL,response JSONB,created_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(user_id,idempotency_key));
+CREATE TABLE settlement_instructions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),trade_id UUID NOT NULL UNIQUE REFERENCES trades(id),status VARCHAR(24) NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','INSTRUCTED','SETTLED','FAILED')),settlement_date DATE NOT NULL DEFAULT CURRENT_DATE,external_reference VARCHAR(120),created_at TIMESTAMPTZ NOT NULL DEFAULT now(),updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE ledger_accounts (id BIGSERIAL PRIMARY KEY,account_code VARCHAR(100) NOT NULL UNIQUE,account_type VARCHAR(20) NOT NULL CHECK(account_type IN ('PARTICIPANT','CLEARING','FEE','SUSPENSE')),participant_id UUID REFERENCES participants(id),currency CHAR(3) NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE ledger_journals (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),settlement_id UUID NOT NULL REFERENCES settlement_instructions(id),description VARCHAR(240) NOT NULL,posted_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE ledger_entries (id BIGSERIAL PRIMARY KEY,journal_id UUID NOT NULL REFERENCES ledger_journals(id),account_id BIGINT NOT NULL REFERENCES ledger_accounts(id),amount NUMERIC(24,8) NOT NULL CHECK(amount <> 0),currency CHAR(3) NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX ledger_entries_journal_idx ON ledger_entries(journal_id);
+CREATE TABLE surveillance_alerts (id BIGSERIAL PRIMARY KEY,rule_code VARCHAR(60) NOT NULL,severity VARCHAR(12) NOT NULL,participant_id UUID REFERENCES participants(id),trade_id UUID REFERENCES trades(id),order_id UUID REFERENCES orders(id),description VARCHAR(1000) NOT NULL,status VARCHAR(20) NOT NULL DEFAULT 'OPEN',detected_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX surveillance_open_idx ON surveillance_alerts(status,detected_at);
+CREATE TABLE regulatory_reports (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),report_type VARCHAR(60) NOT NULL,period_start DATE NOT NULL,period_end DATE NOT NULL,generated_by UUID REFERENCES users(id),generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),record_count INTEGER NOT NULL,payload JSONB NOT NULL);
+
+ALTER TABLE surveillance_alerts ADD COLUMN IF NOT EXISTS resolution_note VARCHAR(1000);

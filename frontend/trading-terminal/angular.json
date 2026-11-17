@@ -14,10 +14,18 @@
             "index": "src/index.html",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
-            "styles": ["src/styles.css"]
+            "styles": [
+              "src/styles.css"
+            ]
           }
         },
-        "serve": { "builder": "@angular/build:dev-server", "options": { "buildTarget": "trading-terminal:build" } }
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "buildTarget": "trading-terminal:build",
+            "proxyConfig": "proxy.conf.json"
+          }
+        }
       }
     }
   },
