@@ -44,3 +44,11 @@ This repository is a development foundation, not a production trading venue. The
 Authentication/OIDC, MFA, authorization, participant onboarding, KYC/AML, credit and pre-trade risk controls, production-grade matching, settlement, market surveillance, regulatory reporting, jurisdiction-specific data residency, HA/DR and production observability remain implementation and validation work.
 
 Do not connect this starter to live markets, real participants or customer funds until security, legal, operational, resilience, performance and market-integrity reviews are complete. Obtain qualified legal and regulatory advice in every operating jurisdiction. Sample credentials and single-node local infrastructure must never be reused in production.
+
+
+## Core trading workflows
+The backend now includes a first implementation of participant registration/approval, JWT authentication and role-based access, instrument reference data, OTC RFQ/quote acceptance, transactional price-time order matching, bilateral trade confirmation, participant risk limits and audit events.
+
+See [core workflow API](docs/api/core-workflows.md) and [implementation status](docs/implementation-status.md). Configure `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` (16+ characters), and a strong `JWT_SECRET` before first startup. Flyway owns the backend schema; the legacy Docker init SQL is intentionally disabled to avoid creating incompatible duplicate tables.
+
+This is a development milestone, not production certification. Review the limitations in the implementation status and API documentation before any live-market use.
