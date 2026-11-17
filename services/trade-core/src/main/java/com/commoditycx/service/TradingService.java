@@ -151,7 +151,7 @@ public class TradingService {
         UUID p=actor.participantId();String col;
         if(Objects.equals(p,t.get("buyer_participant_id"))) col="buyer_confirmed_at";
         else if(Objects.equals(p,t.get("seller_participant_id"))) col="seller_confirmed_at";
-        else forbidden("Only trade counterparties may confirm");
+        else throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Only trade counterparties may confirm");
         db.update("update trades set "+col+"=coalesce("+col+",now()) where id=?",id);
         db.update("update trades set status='CONFIRMED' where id=? and buyer_confirmed_at is not null and seller_confirmed_at is not null",id);
         audit(actor,"TRADE_CONFIRMED","TRADE",id.toString(),Map.of());
