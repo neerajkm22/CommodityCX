@@ -36,7 +36,7 @@ public class AuthController {
   var rows=jdbc.queryForList("select id,password_hash,enabled,participant_id,email,mfa_enabled,mfa_secret_encrypted from users where email=?",in.email().toLowerCase(Locale.ROOT));
   if(rows.isEmpty()||!passwords.matches(in.password(),(String)rows.get(0).get("password_hash")))throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Invalid email or password");
   var u=rows.get(0);if(!Boolean.TRUE.equals(u.get("enabled")))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Account pending approval or disabled");
-  if(Boolean.TRUE.equals(u.get("mfa_enabled"))&&!totp.verify(totp.decrypt((String)u.get("mfa_secret_encrypted)),in.mfaCode()))throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Valid MFA code required");
+  if(Boolean.TRUE.equals(u.get("mfa_enabled"))&&!totp.verify(totp.decrypt((String)u.get("mfa_secret_encrypted")),in.mfaCode()))throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Valid MFA code required");
   UUID id=(UUID)u.get("id");List<String> roles=roles(id);jdbc.update("update users set last_login_at=now() where id=?",id);
   return tokenResponse(id,(String)u.get("email"),u.get("participant_id"),roles);
  }
