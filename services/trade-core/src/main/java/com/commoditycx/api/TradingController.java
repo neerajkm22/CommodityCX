@@ -24,7 +24,7 @@ public class TradingController {
     @PostMapping("/quotes/{quoteId}/accept")
     public Map<String,Object> accept(@PathVariable UUID quoteId,@AuthenticationPrincipal TradingPrincipal actor){return service.acceptQuote(quoteId,actor);}
     @PostMapping("/orders") @ResponseStatus(HttpStatus.CREATED)
-    public List<Map<String,Object>> order(@RequestBody Map<String,Object> body,@AuthenticationPrincipal TradingPrincipal actor){return service.submitOrder(body,actor);}
+    public List<Map<String,Object>> order(@RequestBody Map<String,Object> body,@RequestHeader(value="Idempotency-Key",required=false) String key,@AuthenticationPrincipal TradingPrincipal actor){return service.submitOrder(body,actor,key);}
     @DeleteMapping("/orders/{orderId}") public Map<String,Object> cancel(@PathVariable UUID orderId,@AuthenticationPrincipal TradingPrincipal actor){return service.cancelOrder(orderId,actor);}
     @GetMapping("/instruments/{instrumentId}/order-book") public List<Map<String,Object>> book(@PathVariable UUID instrumentId){return service.orderBook(instrumentId);}
     @PostMapping("/trades/{tradeId}/confirm") public Map<String,Object> confirm(@PathVariable UUID tradeId,@AuthenticationPrincipal TradingPrincipal actor){return service.confirmTrade(tradeId,actor);}

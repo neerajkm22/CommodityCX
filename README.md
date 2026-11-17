@@ -1,54 +1,32 @@
-# CommodityCX — Distributed Commodities OTC Trading Foundation
+# CommodityCX
 
-A starter foundation for a multi-country commodities electronic trading platform supporting bilateral OTC RFQ/negotiation and a centralized order-book workflow.
+CommodityCX is a development foundation for a commodities OTC electronic trading platform.
 
-## Technology baseline
-- UI: Angular 22
-- Services: Java 25 / Spring Boot 3.5
-- Data: PostgreSQL schema and seed data
-- Messaging/cache: Kafka and Redis for local infrastructure
-- Target deployment: AWS; Kubernetes manifests are illustrative EKS starting points
+## Stack
+- Angular 22 trading terminal
+- Java 25 / Spring Boot 3.5 trade-core
+- PostgreSQL 17 with Flyway migrations
+- Kafka transactional outbox publisher (at-least-once delivery)
+- Redis available in local infrastructure for future cache/session integrations
 
-## Repository layout
-- `frontend/trading-terminal`: Angular trading workspace
-- `services/trade-core`: Spring Boot API scaffold
-- `database/init`: PostgreSQL schema and seed data
-- `infra/k8s`: Kubernetes deployment templates
-- `docs`: architecture, security/regulatory gates and runbook
+## Run locally
+1. Copy `.env.example` to `.env`. Replace every example password/key with unique random secrets. Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`.
+2. Start PostgreSQL, Kafka and the API: `docker compose up --build -d`.
+3. Start Angular: `cd frontend/trading-terminal && npm install && npm start`.
+4. Open `http://localhost:4200` and sign in using the bootstrap admin. New participant registrations require ADMIN/COMPLIANCE activation.
 
-## Local infrastructure
-Prerequisites: Docker Compose, Java 25, Maven and a Node.js release supported by Angular 22.
+The API listens on `http://localhost:8080`. Flyway creates and upgrades the database on API startup. Kafka is available to the host on `localhost:9092` and to the API container on `kafka:9092`.
 
-```bash
-docker compose up -d
-```
+## Test
+- Backend: `mvn -f services/trade-core/pom.xml verify` (Docker is required for PostgreSQL/Testcontainers integration tests).
+- Frontend: `cd frontend/trading-terminal && npm install && npm run build`.
+- GitHub Actions runs backend verification, Angular production build and CodeQL analysis on pull requests.
 
-Start the API:
-```bash
-cd services/trade-core
-mvn spring-boot:run
-```
+## Workflow documentation
+- [Core API](docs/api/core-workflows.md)
+- [Advanced API](docs/api/advanced-workflows.md)
+- [Implementation status and production caveats](docs/implementation-status.md)
+- [Security and regulatory gates](docs/security-and-regulatory-gates.md)
 
-Start the UI in another terminal:
-```bash
-cd frontend/trading-terminal
-npm install
-npm start
-```
-
-The API listens on port 8080 and the Angular development server on port 4200. See [docs/runbook.md](docs/runbook.md).
-
-## Current implementation boundary
-This repository is a development foundation, not a production trading venue. The current order endpoint validates a small demo payload and returns a receipt; it does **not** persist, match, execute or settle orders. The UI is a starter trading terminal, not a complete market data or execution interface. The RFQ workflow is not implemented.
-
-Authentication/OIDC, MFA, authorization, participant onboarding, KYC/AML, credit and pre-trade risk controls, production-grade matching, settlement, market surveillance, regulatory reporting, jurisdiction-specific data residency, HA/DR and production observability remain implementation and validation work.
-
-Do not connect this starter to live markets, real participants or customer funds until security, legal, operational, resilience, performance and market-integrity reviews are complete. Obtain qualified legal and regulatory advice in every operating jurisdiction. Sample credentials and single-node local infrastructure must never be reused in production.
-
-
-## Core trading workflows
-The backend now includes a first implementation of participant registration/approval, JWT authentication and role-based access, instrument reference data, OTC RFQ/quote acceptance, transactional price-time order matching, bilateral trade confirmation, participant risk limits and audit events.
-
-See [core workflow API](docs/api/core-workflows.md) and [implementation status](docs/implementation-status.md). Configure `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` (16+ characters), and a strong `JWT_SECRET` before first startup. Flyway owns the backend schema; the legacy Docker init SQL is intentionally disabled to avoid creating incompatible duplicate tables.
-
-This is a development milestone, not production certification. Review the limitations in the implementation status and API documentation before any live-market use.
+## Safety
+This is a development/demo baseline. It is not a certified exchange, broker, clearing system or regulated trading venue. Do not connect it to live markets, customer funds or production personal data before independent security, operational, market-integrity and legal reviews.
