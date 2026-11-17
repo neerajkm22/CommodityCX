@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trade-core
+  namespace: commoditycx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trade-core
+  template:
+    metadata:
+      labels:
+        app: trade-core
+    spec:
+      containers:
+        - name: trade-core
+          image: YOUR_REGISTRY/commoditycx-trade-core:TAG
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trade-core
+  namespace: commoditycx
+spec:
+  selector:
+    app: trade-core
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
