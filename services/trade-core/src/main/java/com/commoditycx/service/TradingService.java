@@ -24,6 +24,7 @@ public class TradingService {
     public List<Map<String,Object>> instruments(){return db.queryForList("select * from instruments order by symbol");}
     @Transactional public Map<String,Object> createRfq(Map<String,Object> in,TradingPrincipal actor) {
         UUID participant=actor.participantId(); if(participant==null) bad("User is not linked to a participant");
+        if(!"BUY".equals(side(in))) bad("This RFQ workflow currently supports buyer-initiated RFQs only");
         UUID id=db.queryForObject("insert into rfqs(reference,instrument_id,buyer_participant_id,seller_participant_id,side,quantity,target_price,currency,delivery_location,delivery_date,expires_at,created_by) values (?,?,?,?,?,?,?,?,?,?,?,?) returning id",
             UUID.class,ref("RFQ"),UUID.fromString(req(in,"instrumentId")),participant,uuid(in.get("sellerParticipantId")),
             side(in),decimal(in,"quantity"),nullableDecimal(in.get("targetPrice")),req(in,"currency"),
@@ -56,6 +57,9 @@ public class TradingService {
         UUID instrument=UUID.fromString(req(in,"instrumentId"));
         Map<String,Object> ins=one("select * from instruments where id=? and active=true for update",instrument,"Instrument unavailable");
         String side=side(in), type=String.valueOf(in.getOrDefault("orderType","LIMIT")).toUpperCase(Locale.ROOT);
+        if(!type.equals("LIMIT") && !type.equals("MARKET")) bad("orderType must be LIMIT or MARKET");
+        String tif=String.valueOf(in.getOrDefault("timeInForce","GTC")).toUpperCase(Locale.ROOT);
+        if(!tif.equals("GTC") && !tif.equals("IOC")) bad("timeInForce must be GTC or IOC");
         BigDecimal qty=decimal(in,"quantity"), price=nullableDecimal(in.get("price"));
         if(qty.compareTo((BigDecimal)ins.get("min_quantity"))<0) bad("Quantity below instrument minimum");
         if("LIMIT".equals(type) && (price==null || price.signum()<=0)) bad("Limit orders require a positive price");
@@ -65,7 +69,7 @@ public class TradingService {
         BigDecimal riskPrice=price==null?decimal(in,"riskPrice"):price;
         if(qty.multiply(riskPrice).compareTo((BigDecimal)limits.get("max_order_notional"))>0) bad("Order notional exceeds participant risk limit");
         UUID order=db.queryForObject("insert into orders(reference,instrument_id,participant_id,user_id,side,order_type,price,quantity,remaining_quantity,time_in_force) values (?,?,?,?,?,?,?,?,?,?) returning id",
-            UUID.class,ref("ORD"),instrument,participant,actor.userId(),side,type,price,qty,qty,String.valueOf(in.getOrDefault("timeInForce","GTC")));
+            UUID.class,ref("ORD"),instrument,participant,actor.userId(),side,type,price,qty,qty,tif);
         audit(actor,"ORDER_ACCEPTED","ORDER",order.toString(),in);
         match(instrument,order,side,type,price,qty,ins);
         return db.queryForList("select * from trades where buy_order_id=? or sell_order_id=? order by created_at",order,order);

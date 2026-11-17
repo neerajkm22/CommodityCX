@@ -23,7 +23,7 @@ public class AuthController {
         this.jdbc=jdbc; this.passwords=passwords; this.jwt=jwt;
     }
     public record RegisterRequest(@NotBlank @Size(max=160) String fullName, @Email @NotBlank String email,
-        @Size(min=12,max=72) String password, @NotBlank String legalName, @Size(min=2,max=2) String countryCode) {}
+        @NotBlank @Size(min=12,max=72) String password, @NotBlank String legalName, @Size(min=2,max=2) String countryCode) {}
     public record LoginRequest(@Email @NotBlank String email, @NotBlank String password) {}
     @PostMapping("/auth/register") @ResponseStatus(HttpStatus.CREATED) @Transactional
     public Map<String,Object> register(@Valid @RequestBody RegisterRequest in) {
